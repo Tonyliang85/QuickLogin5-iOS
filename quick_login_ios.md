@@ -332,6 +332,18 @@ UACustomModel *model = [[UACustomModel alloc]init];
 | SMSLogBtnTextColor | UIColor            | 登录按钮文本颜色 |
 | SMSLogBtnColor     | UIColor            | 登录按钮颜色     |
 
+### 2.5.4. 授权页面的关闭
+
+开发者可以自定义关闭授权页面。
+
+**代码示例**
+
+```objective-c
+…………
+[self dismissViewControllerAnimated:YES completion:nil];
+…………
+```
+
 ## 2.6. 获取手机号码（服务端）
 
 开发者获取token后，需要将token传递到应用服务器，由应用服务器发起获取用户手机号接口的调用。
