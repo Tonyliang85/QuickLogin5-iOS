@@ -147,7 +147,9 @@ sdk技术问题沟通QQ群：609994083</br>
 
 **一键登录逻辑说明**
 
-用户点击登录操作时，开发者调用一键登录方法，若开发者提前预取号成功并且凭证存在且有效，SDK将瞬间拉起用户授权页面（图1），用户授权登录后，SDK将返回token给应用客户端。如果开发者没有提前调用预取号方法或凭证失效，取号将会有一个时延（用户等待的交互由开发者完成），取号成功时，将拉起用户授权页面（图1），取号失败时，如果开发者需要使用SDK自带的短信验证码功能，将跳转到验证码登录页面（图2），否则，将跳转到开发者自定义的页面。
+用户点击登录操作时，开发者调用一键登录方法，若开发者提前预取号成功并且凭证存在且有效，SDK将瞬间拉起用户授权页面（图1），用户授权登录后，SDK将返回token给应用客户端。
+
+如果开发者没有提前调用预取号方法或凭证失效，取号将会有一个时延（用户等待的交互由开发者完成），取号成功时，将拉起用户授权页面（图1），取号失败时，将跳转到验证码登录页面（图2）（开发者可以使用自己的短信验证码登录方式，参考4.7章）
 
 ![](image/auth-sms.png)
 
@@ -157,7 +159,7 @@ sdk技术问题沟通QQ群：609994083</br>
 
 ```objective-c
 [TYRZUILogin getTokenExpWithController:self 
- 						       Timeout:8000 
+ 						       timeout:8000 
  							  complete:^(id sender) {
         						
                               //SDK响应时，客户端执行的逻辑
@@ -173,7 +175,7 @@ sdk技术问题沟通QQ群：609994083</br>
 
 ```objective-c
 + (void)getTokenExpWithController:(UIViewController *)vc
-                          Timeout:(NSTimeInterval)timeout
+                          timeout:(NSTimeInterval)timeout
                          complete:(void (^)(id sender))complete;
 ```
 
@@ -199,9 +201,13 @@ sdk技术问题沟通QQ群：609994083</br>
 
 ### 2.5.1. 页面规范细则
 
-iOS授权页面规范：
+**iOS授权页面规范：**
 
+![](image/authModify.png)
 
+**iOS短验页面规范：**
+
+![](image/SMSModify.png)
 
 
 
@@ -209,15 +215,122 @@ iOS授权页面规范：
 
 ###2.5.2. 修改授权页布局
 
+开发者通过调用授权页面布局方法customUIWithParams，根据2.5.1所示规则配置授权页面默认元素，并且允许开发者在授权页面上添加自定义的控件和事件。
 
+**授权页面默认元素修改**
 
+创建一个UACustomModel 类，设置好类的属性（属性名可参考UACustomModel.h文件查看或者查看2.5.3查看model属性）,然后将设置好的model实例作为参数传进 customUIWithParams方法里
 
+**开发者自定义控件**
 
-### 2.5.3. 开发者自定义控件
+customUIWithParams将把授权页面customAreaView回调给开发者，开发者成功获取该页面后，可以在页面上添加自定义的元素和添加事件。
 
+注意：开发者定义的元素无法覆盖授权页面的默认元素
 
+**方法原型**
 
+```objective-c
++ (void)customUIWithParams:(UACustomModel *)model
+               customViews:(void(^)(UIView *customAreaView))customViews;
+```
 
+**参数说明**
+
+| 参数        | 类型          | 说明                                      |
+| ----------- | ------------- | ----------------------------------------- |
+| model       | UACustomModel | 用于配置页面默认元素的类，具体可参考2.5.3 |
+| customViews | UIView        | 开发者自定义控件                          |
+
+**布局示例代码**
+
+```objective-c
+UACustomModel *model = [[UACustomModel alloc]init];
+	model.navReturnImg = [UIImage imageNamed:@"delete.png"];
+    model.logoImg = [UIImage imageNamed:@"(friend_quan)_[图片]SFont.CN"];
+    model.logoWidth = 100;
+    model.logoHeight = 120;
+    model.numberColor = [UIColor blackColor];
+    model.navText = [[NSAttributedString alloc]initWithString:@"你好" attributes:@{}];
+  	...............
+	...............
+	...............
+    [TYRZUILogin customUIWithParams:model 
+     					customViews:^(UIView *customAreaView) {
+        UIImageView *iamgeView = [[UIImageView alloc]initWithImage:[UIImage imageNamed:@"WechatIMG16.jpeg"]];
+//        [customAreaView addSubview:iamgeView];
+                        }
+    ];
+
+```
+
+### 2.5.3. Model属性
+
+**授权页导航栏属性**
+
+| model属性    | 值类型             | 属性说明             |
+| ------------ | ------------------ | -------------------- |
+| navColor     | UIColor            | 导航栏颜色           |
+| barStyle     | UIBarStyle         | 状态栏着色样式       |
+| navText      | NSAttributedString | 导航栏标题           |
+| navReturnImg | UIImage            | 导航返回图标         |
+| navControl   | UIBarButtonItem    | 导航栏右侧自定义控件 |
+
+**Logo属性**
+
+| model属性   | 值类型  | 属性说明                |
+| ----------- | ------- | :---------------------- |
+| logoImg     | UIImage | LOGO图片                |
+| logoWidth   | CGFloat | 图片宽度                |
+| logoHeight  | CGFloat | 图片高度                |
+| logoOffsetY | CGFloat | 图片Y偏移量             |
+| logoHidden  | BOOL    | 图片隐藏，YES时隐藏logo |
+
+**号码栏属性**
+
+| model属性         | 值类型  | 属性说明                              |
+| ----------------- | ------- | ------------------------------------- |
+| oldStyle          | BOOL    | 显示旧版号码栏样式，YES时显示旧版样式 |
+| numberColor       | UIColor | 手机号码字体颜色                      |
+| swithAccHidden    | BOOL    | 隐藏切换账号按钮，YES时隐藏“切换账号” |
+| swithAccTextColor | UIColor | “切换账号”字体颜色                    |
+| numFieldOffsetY   | CGFloat | 号码栏Y偏移量                         |
+
+**登录按钮属性**
+
+| model属性       | 值类型   | 属性说明         |
+| --------------- | -------- | ---------------- |
+| logBtnText      | NSString | 登录按钮文本     |
+| logBtnOffsetY   | CGFloat  | 登录按钮Y偏移量  |
+| logBtnTextColor | UIColor  | 登录按钮文本颜色 |
+| logBtnColor     | UIColor  | 登录按钮背景颜色 |
+
+**隐私条款属性**
+
+| model属性        | 值类型   | 属性说明                     |
+| ---------------- | -------- | ---------------------------- |
+| uncheckedImg     | UIImage  | 复选框未选中时图片           |
+| checkedImg       | UIImage  | 复选框选中时图片             |
+| appPrivacy       | NSString | 隐私条款名称（含书名号）     |
+| appPrivacyColor  | UIColor  | 隐私条款名称颜色（含书名号） |
+| privacyTextColor | UIColor  | 隐私栏文字颜色（不包含条款） |
+| appPrivacyURL    | NSString | 隐私条款链接                 |
+| privacyOffsetY   | CGFloat  | 隐私条款Y偏移量              |
+
+**底部slogan属性**
+
+| model属性       | 值类型  | 属性说明       |
+| --------------- | ------- | -------------- |
+| sloganOffsetY   | CGFloat | slogan偏移量Y  |
+| sloganTextColor | UIColor | slogan文字颜色 |
+
+**短信验证码页面属性**
+
+| model属性          | 值类型             | 属性说明         |
+| ------------------ | ------------------ | ---------------- |
+| SMSNavText         | NSAttributedString | 短验页面导航标题 |
+| SMSLogBtnText      | NSString           | 登录按钮文本内容 |
+| SMSLogBtnTextColor | UIColor            | 登录按钮文本颜色 |
+| SMSLogBtnColor     | UIColor            | 登录按钮颜色     |
 
 ## 2.6. 获取手机号码（服务端）
 
@@ -480,8 +593,6 @@ iOS授权页面规范：
 
 ## 4.1. 初始化
 
-**功能**
-
 用于初始化appId、appKey设置。
 
 **原型**
@@ -591,11 +702,9 @@ iOS授权页面规范：
 
 ##4.5. 获取网络状态和运营商类型
 
-**功能：**
-
 本方法用于获取用户当前的网络环境和运营商
 
-**原型：**
+**原型**
 
 ```objective-c
 +(NSDictionary*)getNetworkType;
@@ -614,8 +723,6 @@ iOS授权页面规范：
 
 ## 4.6. 删除临时取号凭证
 
-**功能**
-
 本方法用于删除取号方法`getPhoneNumberWithTimeout`成功后返回的取号凭证scrip
 
 **原型**
@@ -633,6 +740,66 @@ iOS授权页面规范：
 | 参数  | 类型 | 说明                                          |
 | ----- | ---- | --------------------------------------------- |
 | state | BOOL | 删除结果状态，（YES：删除成功，NO：删除失败） |
+
+## 4.7. 短信验证码页面配置
+
+本方法用于配置应用在一键登录失败后，是否使用应用自己的短信验证码页面。不调用本方法进行配置时，默认认为应用一键登录失败后，将跳转到SDK提供的短信验证码页面。
+
+当state=YES时，用户一键登录失败时，SDK返回错误码到客户端，客户端根据返回码执行后续的逻辑（如跳转到应用自己的短信验证码等）。
+
+另外，当state=YES时，用户可以在授权页面，点击“切换账号”按钮实现跳转到应用自己的短信验证码页面。开发者可以在一键登录方法中实现该跳转功能。
+
+具体实现示例代码如下：
+
+```objective-c
+[TYRZUILogin getTokenExpWithController:self timeout:-1 complete:^(id sender) {
+       
+    NSLog(@"显示登录:%@",sender);
+        NSString *resultCode = sender[@"resultCode"];
+        self.token = sender[@"token"];
+        NSMutableDictionary *result = [sender mutableCopy];
+        NSLog(@"result = %@",result);
+        if ([resultCode isEqualToString:CLIENTSUCCESSCODECLIENT]) {
+            [self dismissViewControllerAnimated:YES completion:nil];
+            result[@"result"] = @"获取token成功";
+            
+            //用户点击了“切换账号”（customSMS为YES才返回）
+        }else if ([resultCode isEqualToString:@"200060"]){
+            
+            UINavigationController *nav = sender[@"NavigationController"];
+            UIViewController *vc = [[UIViewController alloc]init];
+            
+            
+            //导航栏push模式，可以跳回授权页面
+            [nav pushViewController:vc animated:YES];
+
+            //present模式，无法跳回授权页面
+            //[self presentViewController:vc animated:YES completion:nil];
+        }
+        else {
+            [self dismissViewControllerAnimated:YES completion:nil];
+            result[@"result"] = @"获取token失败";
+        }
+            [self showInfo:result];        
+    }];
+
+```
+
+**原型**
+
+```objective-c
++ (void)enableCustomSMS:(BOOL)state;
+```
+
+**请求参数**
+
+无
+
+**响应参数**
+
+| 参数  | 类型 | 说明                                              |
+| ----- | ---- | ------------------------------------------------- |
+| state | BOOL | 是否使用开发者自定义短验（YES：使用；NO：不使用） |
 
 <div STYLE="page-break-after: always;"></div>
 
@@ -806,54 +973,55 @@ iOS授权页面规范：
 
 使用SDK时，SDK会在认证结束后将结果回调给开发者，其中结果为JSONObject对象，其中resultCode为结果响应码，103000代表成功，其他为失败。成功时在根据token字段取出身份标识。失败时根据resultCode定位失败原因。
 
-| 返回码描述                                         | 返回码 |
-| -------------------------------------------------- | ------ |
-| 成功                                               | 103000 |
-| 无网络                                             | 102101 |
-| 网络异常                                           | 102102 |
-| 未开启数据网络                                     | 102103 |
-| 用户取消登录                                       | 102121 |
-| 输入参数错误                                       | 102203 |
-| 数据解析异常                                       | 102223 |
-| 请求超时                                           | 102507 |
-| 数据网络切换失败                                   | 102508 |
-| 手机未安装sim卡                                    | 200002 |
-| 用户未授权（READ_PHONE_STATE）                     | 200005 |
-| 用户未授权（SEND_SMS）                             | 200006 |
-| authType仅使用短信验证码认证                       | 200007 |
-| 1. authType参数为空；2. authType参数不合法；       | 200008 |
-| 应用合法性校验失败（包名包签名未填写正确）         | 200009 |
-| 预取号时imsi获取失败或者没有sim卡                  | 200010 |
-| 取号失败，跳短信验证码登录                         | 200012 |
-| 短信上行发送短信失败（短信上行）                   | 200013 |
-| 手机号码格式错误（短验）                           | 200014 |
-| 短信验证码格式错误                                 | 200015 |
-| 更新KS失败                                         | 200016 |
-| 非移动卡不支持短信上行                             | 200017 |
-| 不支持网关登录                                     | 200018 |
-| 不支持短信验证码登录                               | 200019 |
-| 用户取消登录                                       | 200020 |
-| 数据解析异常（服务器异常可重新尝试）               | 200021 |
-| 无网络状态                                         | 200022 |
-| 请求超时                                           | 200023 |
-| 数据网络切换失败                                   | 200024 |
-| 未知错误一般出现在线程捕获异常，请配合异常打印分析 | 200025 |
-| 输入参数错误                                       | 200026 |
-| 预取号时未开启数据流量                             | 200027 |
-| 网络请求出错（根据日志分析）                       | 200028 |
-| 请求出错,上次请求未完成                            | 200029 |
-| 没有初始化参数                                     | 200030 |
-| 生成token失败                                      | 200031 |
-| KS缓存不存在                                       | 200032 |
-| 复用中间件获取Token失败                            | 200033 |
-| 预取号token失效                                    | 200034 |
-| 协商ks失败                                         | 200035 |
-| 预取号失败                                         | 200036 |
-| 获取不到openid                                     | 200037 |
-| 电信重定向失败                                     | 200038 |
-| 电信取号接口返回失败                               | 200039 |
-| UI资源加载异常                                     | 200040 |
-| 授权页弹出异常                                     | 200042 |
+| 返回码 | 返回码描述                                         |
+| ------ | -------------------------------------------------- |
+| 103000 | 成功                                               |
+| 102101 | 无网络                                             |
+| 102102 | 网络异常                                           |
+| 102103 | 未开启数据网络                                     |
+| 102121 | 用户取消登录                                       |
+| 102203 | 输入参数错误                                       |
+| 102223 | 数据解析异常                                       |
+| 102507 | 请求超时                                           |
+| 102508 | 数据网络切换失败                                   |
+| 200002 | 手机未安装sim卡                                    |
+| 200005 | 用户未授权（READ_PHONE_STATE）                     |
+| 200006 | 用户未授权（SEND_SMS）                             |
+| 200007 | authType仅使用短信验证码认证                       |
+| 200008 | 1. authType参数为空；2. authType参数不合法；       |
+| 200009 | 应用合法性校验失败（包名包签名未填写正确）         |
+| 200010 | 预取号时imsi获取失败或者没有sim卡                  |
+| 200012 | 取号失败，跳短信验证码登录                         |
+| 200013 | 短信上行发送短信失败（短信上行）                   |
+| 200014 | 手机号码格式错误（短验）                           |
+| 200015 | 短信验证码格式错误                                 |
+| 200016 | 更新KS失败                                         |
+| 200017 | 非移动卡不支持短信上行                             |
+| 200018 | 不支持网关登录                                     |
+| 200019 | 不支持短信验证码登录                               |
+| 200020 | 用户取消登录                                       |
+| 200021 | 数据解析异常（服务器异常可重新尝试）               |
+| 200022 | 无网络状态                                         |
+| 200023 | 请求超时                                           |
+| 200024 | 数据网络切换失败                                   |
+| 200025 | 未知错误一般出现在线程捕获异常，请配合异常打印分析 |
+| 200026 | 输入参数错误                                       |
+| 200027 | 预取号时未开启数据流量                             |
+| 200028 | 网络请求出错（根据日志分析）                       |
+| 200029 | 请求出错,上次请求未完成                            |
+| 200030 | 没有初始化参数                                     |
+| 200031 | 生成token失败                                      |
+| 200032 | KS缓存不存在                                       |
+| 200033 | 复用中间件获取Token失败                            |
+| 200034 | 预取号token失效                                    |
+| 200035 | 协商ks失败                                         |
+| 200036 | 预取号失败                                         |
+| 200037 | 获取不到openid                                     |
+| 200038 | 电信重定向失败                                     |
+| 200039 | 电信取号接口返回失败                               |
+| 200040 | UI资源加载异常                                     |
+| 200042 | 授权页弹出异常                                     |
+| 200060 | 用户点击“切换账号”且使用应用自己的短信验证码时返回 |
 
 ## 6.2. 获取手机号码接口返回码
 
