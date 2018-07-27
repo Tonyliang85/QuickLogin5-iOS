@@ -80,7 +80,7 @@ sdk技术问题沟通QQ群：609994083</br>
 
 整体流程：
 
-![](C:/Users/tonyl/Documents/Git/QuickLogin5-Android/image/pre_gettokenexp.png)
+![](image/pre_gettokenexp.png)
 
 未提前预取号时：
 
@@ -90,7 +90,7 @@ sdk技术问题沟通QQ群：609994083</br>
 
 整体流程：
 
-![](C:/Users/tonyl/Documents/Git/QuickLogin5-Android/image/gettokenexp.png)
+![](image/gettokenexp.png)
 
 ## 2.3. 预取号（非必选）
 
@@ -344,7 +344,75 @@ UACustomModel *model = [[UACustomModel alloc]init];
 …………
 ```
 
-## 2.6. 获取手机号码（服务端）
+## 2.6. 配置短信验证码
+
+SDK提供了基础的短信验证码校验服务，对于中国移动号码，会通过端口下发短信验证码到用户手机；对于联通和电信手机号码，会通过号码池（158开头手机号）将短信验证码下发到用户手机。
+
+开发者通过调用enableCustomSMS方法，配置是否使用SDK提供的短信验证码页面。
+
+**原型**
+
+```objective-c
++ (void)enableCustomSMS:(BOOL)state;
+```
+
+**请求参数**
+
+无
+
+**响应参数**
+
+| 参数  | 类型 | 说明                                                         |
+| ----- | ---- | ------------------------------------------------------------ |
+| state | BOOL | 是否使用开发者自定义短验（YES：使用；NO：不使用），默认值为NO |
+
+当开发者不调用本配置方法或将state=NO时，一键登录失败将跳转到SDK提供的短信验证码页面。
+
+当state=YES时，用户一键登录失败时，SDK返回对应的错误码到客户端，开发者根据客户端接收到的返回码执行后续的逻辑（如跳转到应用自己的短信验证码等）。
+
+另外，当state=YES时，用户可以在授权页面，点击“切换账号”按钮实现跳转到应用自己的短信验证码页面。开发者可以在一键登录方法中实现该跳转功能。
+
+**短信验证码和授权页关系图**
+
+![](image/auth2sms.png)
+
+具体实现示例代码如下：
+
+```objective-c
+[TYRZUILogin getTokenExpWithController:self timeout:-1 complete:^(id sender) {
+       
+    NSLog(@"显示登录:%@",sender);
+        NSString *resultCode = sender[@"resultCode"];
+        self.token = sender[@"token"];
+        NSMutableDictionary *result = [sender mutableCopy];
+        NSLog(@"result = %@",result);
+        if ([resultCode isEqualToString:CLIENTSUCCESSCODECLIENT]) {
+            [self dismissViewControllerAnimated:YES completion:nil];
+            result[@"result"] = @"获取token成功";
+            
+            //用户点击了“切换账号”（customSMS为YES才返回）
+        }else if ([resultCode isEqualToString:@"200060"]){
+            
+            UINavigationController *nav = sender[@"NavigationController"];
+            UIViewController *vc = [[UIViewController alloc]init];
+            
+            
+            //导航栏push模式，可以跳回授权页面
+            [nav pushViewController:vc animated:YES];
+
+            //present模式，无法跳回授权页面
+            //[self presentViewController:vc animated:YES completion:nil];
+        }
+        else {
+            [self dismissViewControllerAnimated:YES completion:nil];
+            result[@"result"] = @"获取token失败";
+        }
+            [self showInfo:result];        
+    }];
+
+```
+
+## 2.7. 获取手机号码（服务端）
 
 开发者获取token后，需要将token传递到应用服务器，由应用服务器发起获取用户手机号接口的调用。
 
@@ -421,7 +489,7 @@ UACustomModel *model = [[UACustomModel alloc]init];
 
 本机号码校验整体流程：
 
-![](C:/Users/tonyl/Documents/Git/QuickLogin5-Android/image/mobile_auth.png)
+![](image/mobile_auth.png)
 
 
 
