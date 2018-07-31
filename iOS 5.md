@@ -5,8 +5,8 @@ sdk技术问题沟通QQ群：609994083</br>
 **注意事项：**
 
 1. 目前SDK支持中国移动2/3/4G、中国电信4G的取号能力，中国联通的取号能力暂未开放。
-2. 由于运营商取号能力是通过数据网关实现，取号过程必须在数据流量打开的情况下才能进行（WiFi和数据流量同时打开时，SDK会强制切换到数据流量执行取号逻辑，将会消耗用户少量流量），当信号弱或者网络有干扰时，时延会高于平均值，取号成功率较低。
-3. 本SDK同时提供一键登录和本机号码校验功能，开发者根据实际的需求调用对应方法和接口。
+2. 一键登录取号能力在取号过程中，用户的手机终端的数据流量必须打开或者终端需允许应用使用数据流量（WiFi和数据流量同时打开时，SDK会强制切换到数据流量执行取号逻辑），当信号弱或者网络有干扰时，时延会高于平均值，取号成功率较低。
+3. 网关取号（一键登录&本机号码校验）过程会消耗用户少量的数据流量，对于漫游状态下的用户可能会造成额外的费用。
 
 ## 1.1. 接入流程
 
@@ -63,46 +63,51 @@ sdk技术问题沟通QQ群：609994083</br>
 
 ## 2.1. 准备工作
 
-在接入一键登录功能之前，开发者必须先按照1.1接入流程，在中国移动开发者社区注册开发者账号，创建一个包含移动认证能力的应用，获取响应的AppId和AppKey，并且在开发者社区中勾选一键登录能力，配置应用服务器出口ip地址。
+在中国移动开发者社区进行以下操作：
+
+1. 获得appid和appkey；
+2. 勾选一键登录能力；
+3. 配置应用服务器的出口ip地址
+4. 配置公钥（如果使用RSA加密方式）
 
 ## 2.2. 流程说明
 
-移动认证一键登录允许开发者在用户同意授权后，在客户端侧获取`接口调用凭证`（token），第三方服务器携带token调用`获取手机号码接口`，实现获取当前授权登录用户的手机号码等信息。
+根据开发者是否提前调用预取号方法，存在2种调用逻辑：
 
-根据开发者是否提前调用预取号，可以用2种调用逻辑：
+**提前预取号时：**
 
-提前预取号时：
-
-1. 开发者调用预取号方法，预取号成功将会返回当前用户取号状态是否成功。
-2. 开发者调用一键登录方法，SDK将拉起授权页；
-3. 用户同意应用获取本机号码，成功时，SDK将返回接口调用凭证token；
-4. 携带token进行接口调用，获取用户的手机号码信息。
+1. 开发者在用户登录前调用`预取号方法`，预取号成功将缓存用户登录凭证在内存中
+2. 开发者调用`一键登录方法`，使用预取号获取的登录凭证取号，并将授权页拉起
+3. 用户授权应用获取本机号码，成功时，SDK将返回取号token给应用客户端
+4. 应用服务器携带本次会话的token前往认证服务器获取用户的手机号码信息
 
 整体流程：
 
 ![](image/pre_gettokenexp.png)
 
-未提前预取号时：
+**未提前预取号时：**
 
-1. 开发者调用显式登录方法，等待取号结果，如果取号成功，SDK将拉起授权页；
-2. 用户同意应用获取本机号码，成功时，SDK将返回接口调用凭证token；
-3. 携带token进行接口调用，获取用户的手机号码信息。
+1. 开发者调用一键登录方法，等待取号结果，如果取号成功，SDK将拉起授权页
+2. 用户授权应用获取本机号码，成功时，SDK将返回取号token给应用客户端
+3. 应用服务器携带本次会话的token前往认证服务器获取用户的手机号码信息
 
 整体流程：
 
 ![](image/gettokenexp.png)
 
-## 2.3. 预取号（非必选）
+## 2.3. SDK相关方法说明
 
-由于移动认证网关取号受用户当前的使用网络状态影响，对于未开启数据网络、弱信号等终端，一键登录网关取号很有可能会失败，因此，移动认证提供预取号方法，在使用一键登录之前，在用户无感知的情况下，调用本方法，提前预知用户当前网络状态是否可实现一键登录，并暂时缓存一个临时取号凭证在应用的运行内存中，保证开发者在使用一键登录时，不需要再次执行耗时更长的网关取号流程。
+### 2.3.1. 预取号（非必选）
 
-预取号时，需要注意以下几点：
+**使用场景**
 
-1. 临时取号凭证保存在内存中，应用被杀死后，凭证也会一起消失。凭证消失后，开发者可以再次调用预取号方法刷新当前用户的网络状态，根据预取号结果，再决定是否调用一键登录方法。
-2. 凭证如果未因为应用被杀死而消失，其有效期为60分钟。
-3. 建议对未登录的用户，在应用开启时或者在用户登录操作前的页面，调用预取号方法。
-4. 预取号是非必选调用，开发者可以直接跳过2.3，直接调用2.4的一键登录方法，在一键登录方法中将会实现预取号的逻辑。（取号过程会有时延，用户能感知）
-5. 支持开发者自定义预取号超时时间。
+对于未登录的用户，调用预取号方法可以提前获知当前用户的手机网络环境是否符合一键登录的使用条件，开发者根据预取号的返回结果决定后续是否使用一键登录（预取号成功获取到临时凭证时，再调用一键登录方法，将大大缩减取号时延）
+
+**使用限制**
+
+1. 预取号**不支持电信和联通手机号码**
+2. 预取号获取的临时凭证将缓存在内存中，应用进程被杀死将有可能丢失（即使临时凭证丢失，开发者也可以调用一键登录方法执行登录逻辑）
+3. 临时凭证有效期为60分钟，只要未丢失，在有效期内将一直可用
 
 **请求示例代码**
 
@@ -141,15 +146,21 @@ sdk技术问题沟通QQ群：609994083</br>
 | resultCode | NSString | 返回相应的结果码 |
 | desc       | NSString | 调用描述         |
 
-## 2.4. 一键登录
 
-开发者在用户需要使用到一键登录的场景，调用一键登录方法，SDK将会拉起用户授权页面，用户授权后，SDK将返回取号调用token给应用客户端。
+
+###2.3.2. 一键登录
+
+**使用场景**
+
+用户进行登录操作时。调用一键登录方法，如果取号成功，SDK将会拉起授权页面，用户授权后，SDK将返回取号token给到应用客户端。
 
 **一键登录逻辑说明**
 
-用户点击登录操作时，开发者调用一键登录方法，若开发者提前预取号成功并且凭证存在且有效，SDK将瞬间拉起用户授权页面（图1），用户授权登录后，SDK将返回token给应用客户端。
+1、存在调用预取号时获取的临时凭证，调用一键登录方法将立即拉起授权页面
 
-如果开发者没有提前调用预取号方法或凭证失效，取号将会有一个时延（用户等待的交互由开发者完成），取号成功时，将拉起用户授权页面（图1），取号失败时，将跳转到验证码登录页面（图2）（开发者可以使用自己的短信验证码登录方式，参考4.7章）
+2、不存在临时凭证时，调用一键登录方法，将有一个很短的时延，待取号成功后拉起授权页面
+
+3、取号失败时，如果SDK短信验证码开关打开，将跳转到短信验证页面
 
 ![](image/auth-sms.png)
 
@@ -195,11 +206,79 @@ sdk技术问题沟通QQ群：609994083</br>
 | openId     | NSString | 成功时返回：用户身份唯一标识                                 |
 | token      | NSString | 成功时返回：临时凭证，token有效期2min，一次有效，同一用户（手机号）10分钟内获取token且未使用的数量不超过30个 |
 
-## 2.5. 授权页面设计
+### 2.3.3. 配置短信验证码
+
+**使用场景**
+
+SDK提供了基础的短信验证码校验服务，对于中国移动号码，会通过端口下发短信验证码到用户手机；对于联通和电信手机号码，会通过号码池（158开头手机号）将短信验证码下发到用户手机。
+
+开发者通过调用enableCustomSMS方法，配置是否使用SDK提供的短信验证码页面。
+
+**原型**
+
+```objective-c
++ (void)enableCustomSMS:(BOOL)state;
+```
+
+**请求参数**
+
+无
+
+**响应参数**
+
+| 参数  | 类型 | 说明                                                         |
+| ----- | ---- | ------------------------------------------------------------ |
+| state | BOOL | 是否使用开发者自定义短验（YES：使用；NO：不使用），默认值为NO |
+
+state=NO时，一键登录失败将跳转到SDK提供的短信验证码页面
+
+state=YES时，一键登录失败，开发者可自行处理授权页面
+
+
+
+具体实现示例代码如下：
+
+```objective-c
+[TYRZUILogin getTokenExpWithController:self timeout:-1 complete:^(id sender) {
+       
+    NSLog(@"显示登录:%@",sender);
+        NSString *resultCode = sender[@"resultCode"];
+        self.token = sender[@"token"];
+        NSMutableDictionary *result = [sender mutableCopy];
+        NSLog(@"result = %@",result);
+        if ([resultCode isEqualToString:CLIENTSUCCESSCODECLIENT]) {
+            [self dismissViewControllerAnimated:YES completion:nil];
+            result[@"result"] = @"获取token成功";
+            
+            //用户点击了“切换账号”（customSMS为YES才返回）
+        }else if ([resultCode isEqualToString:@"200060"]){
+            
+            UINavigationController *nav = sender[@"NavigationController"];
+            UIViewController *vc = [[UIViewController alloc]init];
+            
+            
+            //导航栏push模式，可以跳回授权页面
+            [nav pushViewController:vc animated:YES];
+
+            //present模式，无法跳回授权页面
+            //[self presentViewController:vc animated:YES completion:nil];
+        }
+        else {
+            [self dismissViewControllerAnimated:YES completion:nil];
+            result[@"result"] = @"获取token失败";
+        }
+            [self showInfo:result];        
+    }];
+
+```
+
+
+
+## 2.4. 授权页面设计
 
 为了确保用户在登录过程中将手机号码信息授权给开发者使用的知情权，一键登录需要开发者提供授权页登录页面供用户授权确认。开发者在调用授权登录方法前，必须弹出授权页，明确告知用户当前操作会将用户的本机号码信息传递给应用。
 
-### 2.5.1. 页面规范细则
+### 2.4.1. 页面规范细则
 
 **iOS授权页面规范：**
 
@@ -213,13 +292,13 @@ sdk技术问题沟通QQ群：609994083</br>
 
 **注意：开发者不得通过任何技术手段，将授权页面的隐私栏、品牌露出内容隐藏、覆盖，对于接入移动认证SDK并上线的应用，我方会对上线的应用授权页面做审查，如果有出现未按要求设计授权页面，将隐私栏、品牌等UI隐去不可见的设计，我方有权将应用的登录功能下线。**
 
-###2.5.2. 修改授权页布局
+###2.4.2. 修改授权页布局
 
-开发者通过调用授权页面布局方法customUIWithParams，根据2.5.1所示规则配置授权页面默认元素，并且允许开发者在授权页面上添加自定义的控件和事件。
+开发者通过调用授权页面布局方法customUIWithParams，根据2.4.1所示规则配置授权页面默认元素，并且允许开发者在授权页面上添加自定义的控件和事件。
 
 **授权页面默认元素修改**
 
-创建一个UACustomModel 类，设置好类的属性（属性名可参考UACustomModel.h文件查看或者查看2.5.3查看model属性）,然后将设置好的model实例作为参数传进 customUIWithParams方法里
+创建一个UACustomModel 类，设置好类的属性（属性名可参考UACustomModel.h文件查看或者查看2.4.3查看model属性）,然后将设置好的model实例作为参数传进 customUIWithParams方法里
 
 **开发者自定义控件**
 
@@ -238,7 +317,7 @@ customUIWithParams将把授权页面customAreaView回调给开发者，开发者
 
 | 参数        | 类型          | 说明                                      |
 | ----------- | ------------- | ----------------------------------------- |
-| model       | UACustomModel | 用于配置页面默认元素的类，具体可参考2.5.3 |
+| model       | UACustomModel | 用于配置页面默认元素的类，具体可参考2.4.3 |
 | customViews | UIView        | 开发者自定义控件                          |
 
 **布局示例代码**
@@ -263,7 +342,7 @@ UACustomModel *model = [[UACustomModel alloc]init];
 
 ```
 
-### 2.5.3. Model属性
+### 2.4.3. Model属性
 
 **授权页导航栏属性**
 
@@ -332,7 +411,7 @@ UACustomModel *model = [[UACustomModel alloc]init];
 | SMSLogBtnTextColor | UIColor            | 登录按钮文本颜色 |
 | SMSLogBtnColor     | UIColor            | 登录按钮颜色     |
 
-### 2.5.4. 授权页面的关闭
+### 2.4.4. 授权页面的关闭
 
 开发者可以自定义关闭授权页面。
 
@@ -344,75 +423,7 @@ UACustomModel *model = [[UACustomModel alloc]init];
 …………
 ```
 
-## 2.6. 配置短信验证码
-
-SDK提供了基础的短信验证码校验服务，对于中国移动号码，会通过端口下发短信验证码到用户手机；对于联通和电信手机号码，会通过号码池（158开头手机号）将短信验证码下发到用户手机。
-
-开发者通过调用enableCustomSMS方法，配置是否使用SDK提供的短信验证码页面。
-
-**原型**
-
-```objective-c
-+ (void)enableCustomSMS:(BOOL)state;
-```
-
-**请求参数**
-
-无
-
-**响应参数**
-
-| 参数  | 类型 | 说明                                                         |
-| ----- | ---- | ------------------------------------------------------------ |
-| state | BOOL | 是否使用开发者自定义短验（YES：使用；NO：不使用），默认值为NO |
-
-当开发者不调用本配置方法或将state=NO时，一键登录失败将跳转到SDK提供的短信验证码页面。
-
-当state=YES时，用户一键登录失败时，SDK返回对应的错误码到客户端，开发者根据客户端接收到的返回码执行后续的逻辑（如跳转到应用自己的短信验证码等）。
-
-另外，当state=YES时，用户可以在授权页面，点击“切换账号”按钮实现跳转到应用自己的短信验证码页面。开发者可以在一键登录方法中实现该跳转功能。
-
-**短信验证码和授权页关系图**
-
-![](image/auth2sms.png)
-
-具体实现示例代码如下：
-
-```objective-c
-[TYRZUILogin getTokenExpWithController:self timeout:-1 complete:^(id sender) {
-       
-    NSLog(@"显示登录:%@",sender);
-        NSString *resultCode = sender[@"resultCode"];
-        self.token = sender[@"token"];
-        NSMutableDictionary *result = [sender mutableCopy];
-        NSLog(@"result = %@",result);
-        if ([resultCode isEqualToString:CLIENTSUCCESSCODECLIENT]) {
-            [self dismissViewControllerAnimated:YES completion:nil];
-            result[@"result"] = @"获取token成功";
-            
-            //用户点击了“切换账号”（customSMS为YES才返回）
-        }else if ([resultCode isEqualToString:@"200060"]){
-            
-            UINavigationController *nav = sender[@"NavigationController"];
-            UIViewController *vc = [[UIViewController alloc]init];
-            
-            
-            //导航栏push模式，可以跳回授权页面
-            [nav pushViewController:vc animated:YES];
-
-            //present模式，无法跳回授权页面
-            //[self presentViewController:vc animated:YES completion:nil];
-        }
-        else {
-            [self dismissViewControllerAnimated:YES completion:nil];
-            result[@"result"] = @"获取token失败";
-        }
-            [self showInfo:result];        
-    }];
-
-```
-
-## 2.7. 获取手机号码（服务端）
+## 2.5. 获取手机号码（服务端）
 
 开发者获取token后，需要将token传递到应用服务器，由应用服务器发起获取用户手机号接口的调用。
 
@@ -460,6 +471,72 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 | sign                | 必选 | 当**encryptionalgorithm≠"RSA"**时，sign = MD5（appid + version + msgid + systemtime + strictcheck + token + appkey)（注：“+”号为合并意思，不包含在被加密的字符串中），输出32位大写字母；</br>当**encryptionalgorithm="RSA"**，业务端RSA私钥签名（appid+token）, 服务端使用业务端提供的公钥验证签名（公钥可以在开发者社区配置）。 |
 | encryptionalgorithm | 可选 | 推荐使用。开发者如果需要使用非对称加密算法时，填写“RSA”。（当该值不设置为“RSA”时，执行MD5签名校验） |
 
+MD5校验示例：
+
+```java
+    String md5Sign = EncryptionUtil.encryptMD5(appid + ver + msgid + timestamp + strictcheck + token + appkey);
+
+    private static final char[] HEX_DIGITS = "0123456789ABCDEF".toCharArray();
+
+    public static String encryptMD5(String data) {
+        return data == null ? null : hashEncrypt(data, "MD5");
+    }
+
+    private static String hashEncrypt(String data, String algorithm) {
+        try {
+            MessageDigest md = MessageDigest.getInstance(algorithm);
+            md.update(data.getBytes(ClientConstants.DEFAULT_ENCODING));
+            return bytes2Hex(md.digest());
+        } catch (Exception never) {
+            throw new ClientServiceException(ErrorCode.CM_ENCRYPTION_ERROR_CODE.getCode(),"加密失败...",never);
+        }
+    }
+     private static String bytes2Hex(byte[] bytes) {
+        int len = bytes.length;
+        char[] str = new char[len * 2];
+        for (int i = 0; i < len; i++) {
+            byte b = bytes[i];
+            str[i * 2] = HEX_DIGITS[b >>> 4 & 0xF];
+            str[i * 2 + 1] = HEX_DIGITS[b & 0xF];
+        }
+        return new String(str);
+    }
+```
+
+RSA签名示例：
+
+```java
+public String generalSign(byte[] data, RSAPrivateKey privateKey) {
+		Signature signature = null;
+		try {
+			signature = Signature.getInstance("SHA256withRSA");
+			signature.initSign(privateKey);
+			signature.update(data);
+			return byte2hex(signature.sign());
+		} catch (Exception e) {
+			logger.error("发生错误", e);
+			return null;
+		}
+
+	}
+	
+	public String byte2hex(byte[] b) {
+		String hs = "";
+		String stmp = "";
+		for (int n = 0; n < b.length; n++) {
+			stmp = (java.lang.Integer.toHexString(b[n] & 0XFF));
+			if (stmp.length() == 1) {
+				hs = hs + "0" + stmp;
+			} else {
+				hs = hs + stmp;
+			}
+		}
+		return hs.toUpperCase();
+	}
+```
+
+
+
 **返回说明**
 
 | 参数         | 类型   | 说明                                                         |
@@ -469,13 +546,51 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 | resultcode   | string | 返回码                                                       |
 | msisdn       | string | 表示手机号码，如果加密方式为RSA，应用需要用私钥进行解密      |
 
+RSA解密示例
+
+```java
+public static String privateKeyDecrypt(String encodeData,RSAPrivateKey privateKey) {
+	        Cipher cipher = null;
+	        try {
+	            byte[] data = hexStr2byte(encodeData);
+	            cipher = Cipher.getInstance("RSA");
+	            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+	            byte[] output = cipher.doFinal(data);
+	            return new String(output, ClientConstants.DEFAULT_ENCODING);
+	        } catch (Exception e) {
+	            logger.error("发生错误", e.getMessage());
+	        }
+	        return null;
+	    }
+	 
+	 public static byte[] hexStr2byte(String strhex) {
+			if (strhex == null) {
+				return null;
+			}
+			int l = strhex.length();
+			if (l % 2 == 1) {
+				return null;
+			}
+			byte[] b = new byte[l / 2];
+			for (int i = 0; i != l / 2; i++) {
+				b[i] = (byte) Integer.parseInt(strhex.substring(i * 2, i * 2 + 2), 16);
+			}
+			return b;
+		}
+```
+
 <div STYLE="page-break-after: always;"></div>
 
 # 3. 本机号码校验功能
 
 ## 3.1. 准备工作
 
-在接入本机号码校验功能之前，开发者必须先按照1.1 接入流程，在中国移动开发者社区注册开发者账号，创建一个包含移动认证能力的应用，获取响应的AppId和AppKey。并且在开发者社区中勾选本机号码校验能力，配置应用服务器出口ip地址。
+在中国移动开发者社区进行以下操作：
+
+1. 获得appid和appkey；
+2. 勾选一键登录能力；
+3. 配置应用服务器的出口ip地址
+4. 配置公钥（如果使用RSA加密方式）
 
 ## 3.2. 流程说明
 
@@ -483,66 +598,19 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 
 整体流程为：
 
-1. 开发者调用预取号方法，预取号成功将会返回当前用户取号状态是否成功。（非必选）
-2. 调用本机号码校验方法，获取用于做本机号码校验的接口调用凭证（token）
-3. 携带token和手机号码信息进行接口调用，获取手机号码校验结果。
+1. *开发者调用预取号方法，预取号成功将会返回当前用户取号状态是否成功。（非必选）*
+2. 调用本机号码校验方法，获取号码校验token
+3. 携带token和手机号码信息调用本机号码校验接口，获取手机号码校验结果。
 
 本机号码校验整体流程：
 
 ![](image/mobile_auth.png)
 
+## 3.3. SDK相关方法说明
 
+###3.3.1 本机号码校验
 
-## 3.3. 预取号（非必选）
-
-由于移动认证网关取号受用户当前的使用网络状态影响，对于未开启数据网络、弱信号等终端，本机号码校验网关取号很有可能会失败，因此，移动认证提供预取号方法，在使用本机号码校验之前，在用户无感知的情况下，调用本方法，提前预知用户当前网络状态是否可实现本机号码校验，并暂时缓存一个临时取号凭证在应用的运行内存中，保证开发者在使用本机号码校验时，不需要再次执行耗时更长的网关取号流程。
-
-预取号时，需要注意以下几点：
-
-1. 临时取号凭证保存在内存中，应用被杀死后，凭证也会一起消失。凭证消失后，开发者可以再次调用预取号方法刷新当前用户的网络状态，根据预取号结果，再决定是否调用本机号码校验方法。
-2. 凭证如果未因为应用被杀死而消失，其有效期为60分钟。
-3. 建议对未登录的用户，在应用开启时或者在用户登录操作前的页面，调用预取号方法。
-4. 预取号是非必选调用，开发者可以直接跳过3.3，直接调用3.4的本机号码校验方法，在本机号码校验方法中将会实现预取号的逻辑。（取号过程会有时延，用户能感知）
-5. 设置取号超时方法适用于预取号。
-
-**请求示例代码**
-
-```objective-c
-[TYRZUILogin preGetPhonenumberWithTimeout:8000 
- 						       completion:^(id sender) {
-        NSString *resultCode = sender[@"resultCode"];
-        NSMutableDictionary *result = [NSMutableDictionary dictionaryWithDictionary:sender];
-        if ([resultCode isEqualToString:CLIENTSUCCESSCODECLIENT]) {
-            NSLog(@"预取号成功");
-        } else {
-            NSLog(@"预取号失败");
-        }
-        [self showInfo:result];
-    }];
-```
-
-**预取号方法原型**
-
-```objective-c
-+ (void)preGetPhonenumberWithTimeout:(NSTimeInterval)timeout 
-    					  completion:(void(^)(id sender))complete;
-```
-
-**参数说明：**
-
-| 参数     | 类型           | 说明                                         |
-| -------- | -------------- | -------------------------------------------- |
-| timeout  | NSTimeInterval | 自定义取号超时时间（默认8000毫秒），单位：ms |
-| complete | Block          | 取号回调                                     |
-
-**返回说明：**
-
-| 参数       | 类型     | 说明             |
-| ---------- | -------- | ---------------- |
-| resultCode | NSString | 返回相应的结果码 |
-| desc       | NSString | 调用描述         |
-
-## 3.4. 获取号码校验token
+**使用场景**
 
 开发者可以在应用内部任意页面调用本方法，获取本机号码校验的接口调用凭证（token）
 
@@ -584,7 +652,7 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 | resultCode | NSString | 返回相应的结果码 |
 | desc       | NSString | 调用描述         |
 
-## 3.5. 本机号码校验（服务端）
+## 3.4. 本机号码校验（服务端）
 
 开发者获取token后，需要将token传递到应用服务器，由应用服务器发起本机号码校验接口的调用。
 
@@ -597,7 +665,7 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 对于本机号码校验，需要注意：
 
 1. 本产品属于收费业务，开发者未签订服务合同前，每天总调用次数有限，详情可咨询商务。
-2. 签订合同后，将不在提供每天免费的测试次数。
+2. 签订合同后，将不再提供每天免费的测试次数。
 
 **接口说明：**
 
@@ -694,15 +762,31 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 
 ## 4.2. 预取号
 
-由于移动认证网关取号受用户当前的使用网络状态影响，对于未开启数据网络、弱信号等终端，本机号码校验网关取号很有可能会失败，因此，移动认证提供预取号方法，在使用本机号码校验之前，在用户无感知的情况下，调用本方法，提前预知用户当前网络状态是否可实现本机号码校验，并暂时缓存一个临时取号凭证在应用的运行内存中，保证开发者在使用本机号码校验时，不需要再次执行耗时更长的网关取号流程。
+**使用场景**
 
-预取号时，需要注意以下几点：
+对于未登录的用户，调用预取号方法可以提前获知当前用户的手机网络环境是否符合一键登录的使用条件，开发者根据预取号的返回结果决定后续是否使用一键登录（预取号成功获取到临时凭证时，再调用一键登录方法，将大大缩减取号时延）
 
-1. 临时取号凭证保存在内存中，应用被杀死后，凭证也会一起消失。凭证消失后，开发者可以再次调用预取号方法刷新当前用户的网络状态，根据预取号结果，再决定是否调用本机号码校验方法。
-2. 凭证如果未因为应用被杀死而消失，其有效期为60分钟。
-3. 建议对未登录的用户，在应用开启时或者在用户登录操作前的页面，调用预取号方法。
-4. 预取号是非必选调用，开发者可以直接跳过3.3，直接调用3.4的本机号码校验方法，在本机号码校验方法中将会实现预取号的逻辑。（取号过程会有时延，用户能感知）
-5. 设置取号超时方法适用于预取号。
+**使用限制**
+
+1. 预取号**不支持电信和联通手机号码**
+2. 预取号获取的临时凭证将缓存在内存中，应用进程被杀死将有可能丢失（即使临时凭证丢失，开发者也可以调用一键登录方法执行登录逻辑）
+3. 临时凭证有效期为60分钟，只要未丢失，在有效期内将一直可用
+
+**请求示例代码**
+
+```objective-c
+[TYRZUILogin preGetPhonenumberWithTimeout:8000 
+ 						       completion:^(id sender) {
+        NSString *resultCode = sender[@"resultCode"];
+        NSMutableDictionary *result = [NSMutableDictionary dictionaryWithDictionary:sender];
+        if ([resultCode isEqualToString:CLIENTSUCCESSCODECLIENT]) {
+            NSLog(@"预取号成功");
+        } else {
+            NSLog(@"预取号失败");
+        }
+        [self showInfo:result];
+    }];
+```
 
 **预取号方法原型**
 
@@ -727,13 +811,43 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 
 ## 4.3. 一键登录
 
-开发者在用户需要使用到一键登录的场景，调用一键登录方法，SDK将会拉起用户授权页面，用户授权后，SDK将返回取号调用token给应用客户端。
+**使用场景**
+
+用户进行登录操作时。调用一键登录方法，如果取号成功，SDK将会拉起授权页面，用户授权后，SDK将返回取号token给到应用客户端。
+
+**一键登录逻辑说明**
+
+1、存在调用预取号时获取的临时凭证，调用一键登录方法将立即拉起授权页面
+
+2、不存在临时凭证时，调用一键登录方法，将有一个很短的时延，待取号成功后拉起授权页面
+
+3、取号失败时，如果SDK短信验证码开关打开，将跳转到短信验证页面
+
+![](C:/Users/tonyl/Documents/Git/QuickLogin5-iOS/image/auth-sms.png)
+
+
+
+**请求示例代码**
+
+```objective-c
+[TYRZUILogin getTokenExpWithController:self 
+ 						       timeout:8000 
+ 							  complete:^(id sender) {
+        						
+                              //SDK响应时，客户端执行的逻辑
+                                ……………… 
+                                ………………
+                              //可参考demo示例代码                   
+    }
+];
+
+```
 
 **一键登录方法原型**
 
 ```objective-c
 + (void)getTokenExpWithController:(UIViewController *)vc
-                          Timeout:(NSTimeInterval)timeout
+                          timeout:(NSTimeInterval)timeout
                          complete:(void (^)(id sender))complete;
 ```
 
@@ -755,7 +869,26 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 
 ## 4.4. 本机号码校验
 
-用于获取本机号码校验接口调用token
+**使用场景**
+
+开发者可以在应用内部任意页面调用本方法，获取本机号码校验的接口调用凭证（token）
+
+**请求示例代码**
+
+```objective-c
+[TYRZUILogin getTokenImpWithTimeout:8000 
+ 					       Complete:^(id sender) {
+        
+        NSString *resultCode = sender[@"resultCode"];
+        if ([resultCode isEqualToString:SUCCESSCODE]) {
+            self.token = sender[@"token"];
+        }
+        
+        [self showInfo:sender];
+        
+    }];
+
+```
 
 **本机号码校验方法原型**
 
@@ -823,11 +956,33 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 
 ## 4.7. 短信验证码页面配置
 
-本方法用于配置应用在一键登录失败后，是否使用应用自己的短信验证码页面。不调用本方法进行配置时，默认认为应用一键登录失败后，将跳转到SDK提供的短信验证码页面。
+**使用场景**
 
-当state=YES时，用户一键登录失败时，SDK返回错误码到客户端，客户端根据返回码执行后续的逻辑（如跳转到应用自己的短信验证码等）。
+SDK提供了基础的短信验证码校验服务，对于中国移动号码，会通过端口下发短信验证码到用户手机；对于联通和电信手机号码，会通过号码池（158开头手机号）将短信验证码下发到用户手机。
 
-另外，当state=YES时，用户可以在授权页面，点击“切换账号”按钮实现跳转到应用自己的短信验证码页面。开发者可以在一键登录方法中实现该跳转功能。
+开发者通过调用enableCustomSMS方法，配置是否使用SDK提供的短信验证码页面。
+
+**原型**
+
+```objective-c
++ (void)enableCustomSMS:(BOOL)state;
+```
+
+**请求参数**
+
+无
+
+**响应参数**
+
+| 参数  | 类型 | 说明                                                         |
+| ----- | ---- | ------------------------------------------------------------ |
+| state | BOOL | 是否使用开发者自定义短验（YES：使用；NO：不使用），默认值为NO |
+
+state=NO时，一键登录失败将跳转到SDK提供的短信验证码页面
+
+state=YES时，一键登录失败，开发者可自行处理授权页面
+
+
 
 具体实现示例代码如下：
 
@@ -865,21 +1020,9 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 
 ```
 
-**原型**
 
-```objective-c
-+ (void)enableCustomSMS:(BOOL)state;
-```
 
-**请求参数**
 
-无
-
-**响应参数**
-
-| 参数  | 类型 | 说明                                              |
-| ----- | ---- | ------------------------------------------------- |
-| state | BOOL | 是否使用开发者自定义短验（YES：使用；NO：不使用） |
 
 <div STYLE="page-break-after: always;"></div>
 
@@ -915,6 +1058,72 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 | sign                | string | 必选 | 当**encryptionalgorithm≠"RSA"**时，sign = MD5（appid + version + msgid + systemtime + strictcheck + token + appkey)（注：“+”号为合并意思，不包含在被加密的字符串中），输出32位大写字母；</br>当**encryptionalgorithm="RSA"**，业务端RSA私钥签名（appid+token）, 服务端使用业务端提供的公钥验证签名（公钥可以在开发者社区配置）。 |
 | encryptionalgorithm | string | 可选 | 开发者如果需要使用非对称加密算法时，填写“RSA”。（当该值不设置为“RSA”时，执行MD5签名校验） |
 
+MD5校验示例：
+
+```java
+    String md5Sign = EncryptionUtil.encryptMD5(appid + ver + msgid + timestamp + strictcheck + token + appkey);
+
+    private static final char[] HEX_DIGITS = "0123456789ABCDEF".toCharArray();
+
+    public static String encryptMD5(String data) {
+        return data == null ? null : hashEncrypt(data, "MD5");
+    }
+
+    private static String hashEncrypt(String data, String algorithm) {
+        try {
+            MessageDigest md = MessageDigest.getInstance(algorithm);
+            md.update(data.getBytes(ClientConstants.DEFAULT_ENCODING));
+            return bytes2Hex(md.digest());
+        } catch (Exception never) {
+            throw new ClientServiceException(ErrorCode.CM_ENCRYPTION_ERROR_CODE.getCode(),"加密失败...",never);
+        }
+    }
+     private static String bytes2Hex(byte[] bytes) {
+        int len = bytes.length;
+        char[] str = new char[len * 2];
+        for (int i = 0; i < len; i++) {
+            byte b = bytes[i];
+            str[i * 2] = HEX_DIGITS[b >>> 4 & 0xF];
+            str[i * 2 + 1] = HEX_DIGITS[b & 0xF];
+        }
+        return new String(str);
+    }
+```
+
+RSA签名示例：
+
+```java
+public String generalSign(byte[] data, RSAPrivateKey privateKey) {
+		Signature signature = null;
+		try {
+			signature = Signature.getInstance("SHA256withRSA");
+			signature.initSign(privateKey);
+			signature.update(data);
+			return byte2hex(signature.sign());
+		} catch (Exception e) {
+			logger.error("发生错误", e);
+			return null;
+		}
+
+	}
+	
+	public String byte2hex(byte[] b) {
+		String hs = "";
+		String stmp = "";
+		for (int n = 0; n < b.length; n++) {
+			stmp = (java.lang.Integer.toHexString(b[n] & 0XFF));
+			if (stmp.length() == 1) {
+				hs = hs + "0" + stmp;
+			} else {
+				hs = hs + stmp;
+			}
+		}
+		return hs.toUpperCase();
+	}
+```
+
+
+
 **响应参数**
 
 | 参数         | 类型   | 约束 | 说明                                                         |
@@ -923,6 +1132,39 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 | systemtime   | string | 必选 | 响应消息发送的系统时间，精确到毫秒，共17位，格式：20121227180001165 |
 | resultcode   | string | 必选 | 返回码                                                       |
 | msisdn       | string | 必选 | 表示手机号码，如果加密方式为RSA，应用需要用私钥进行解密      |
+
+RSA解密示例
+
+```java
+public static String privateKeyDecrypt(String encodeData,RSAPrivateKey privateKey) {
+	        Cipher cipher = null;
+	        try {
+	            byte[] data = hexStr2byte(encodeData);
+	            cipher = Cipher.getInstance("RSA");
+	            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+	            byte[] output = cipher.doFinal(data);
+	            return new String(output, ClientConstants.DEFAULT_ENCODING);
+	        } catch (Exception e) {
+	            logger.error("发生错误", e.getMessage());
+	        }
+	        return null;
+	    }
+	 
+	 public static byte[] hexStr2byte(String strhex) {
+			if (strhex == null) {
+				return null;
+			}
+			int l = strhex.length();
+			if (l % 2 == 1) {
+				return null;
+			}
+			byte[] b = new byte[l / 2];
+			for (int i = 0; i != l / 2; i++) {
+				b[i] = (byte) Integer.parseInt(strhex.substring(i * 2, i * 2 + 2), 16);
+			}
+			return b;
+		}
+```
 
 ### 5.1.3. 示例
 
@@ -1102,6 +1344,8 @@ SDK提供了基础的短信验证码校验服务，对于中国移动号码，�
 | 200040 | UI资源加载异常                                     |
 | 200042 | 授权页弹出异常                                     |
 | 200060 | 用户点击“切换账号”且使用应用自己的短信验证码时返回 |
+| 200062 | 联通号码不支持预取号                               |
+| 200063 | 电信号码不支持预取号                               |
 
 ## 6.2. 获取手机号码接口返回码
 
