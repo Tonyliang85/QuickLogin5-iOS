@@ -468,7 +468,7 @@ UACustomModel *model = [[UACustomModel alloc]init];
 | appid               | 必选 | 业务在统一认证申请的应用id                                   |
 | expandparams        | 可选 | 扩展参数                                                     |
 | token               | 必选 | 需要解析的凭证值。                                           |
-| sign                | 必选 | 当**encryptionalgorithm≠"RSA"**时，sign = MD5（appid + version + msgid + systemtime + strictcheck + token + appkey)（注：“+”号为合并意思，不包含在被加密的字符串中），输出32位大写字母；</br>当**encryptionalgorithm="RSA"**，业务端RSA私钥签名（appid+token）, 服务端使用业务端提供的公钥验证签名（公钥可以在开发者社区配置）。 |
+| sign                | 必选 | 当**encryptionalgorithm≠"RSA"**时，sign = MD5（appid + version + msgid + systemtime + strictcheck + token + appkey)（注：“+”号为合并意思，不包含在被加密的字符串中），输出32位大写字母；</br>当**encryptionalgorithm="RSA"**，业务端RSA私钥签名（appid+token，加密方法是SHA256withRSA）, 服务端使用业务端提供的公钥验证签名（公钥可以在开发者社区配置）。 |
 | encryptionalgorithm | 可选 | 推荐使用。开发者如果需要使用非对称加密算法时，填写“RSA”。（当该值不设置为“RSA”时，执行MD5签名校验） |
 
 MD5校验示例：
